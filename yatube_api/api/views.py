@@ -6,51 +6,53 @@ from django.shortcuts import get_object_or_404
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-from .permision import AuthorPermission
+from .permissions import IsAuthorOrReadOnly
 from posts.models import Follow, Comment, Group, Post
 from .serializers import FollowSerializer
 from .serializers import CommentSerializer, GroupSerializer, PostSerializer
 
-class GroupViewSet(viewsets.ModelViewSet):
+class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = (permissions.IsAdminUser,)
-    
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None 
+
+class PostPagination(LimitOffsetPagination):
+    default_limit = 10
 
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = LimitOffsetPagination
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, 
+                          IsAuthorOrReadOnly]
+    pagination_class = PostPagination
 
-    def create(self, serializer):
+    def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated]  
-
-    def create(self, serializer):
-        post = get_object_or_404(Post, id=self.kwargs.get('post_id'))
-        serializer.save(author=self.request.user, post=post)
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, 
+                          IsAuthorOrReadOnly]
+    pagination_class = None
 
     def get_queryset(self):
-        post = get_object_or_404(Post, id=self.kwargs.get('post_id'))
-        return post.comments.all()
-    
-    def perform_destroy(self, instance):
-        if instance.author != self.request.user:
-            raise PermissionDenied("Вы не можете удалить данный комментарий.")
-        instance.delete()
-    
+        post_id = self.kwargs.get('post_id')
+        return Comment.objects.filter(post_id=post_id)
+
+    def perform_create(self, serializer):
+        post = get_object_or_404(Post, pk=self.kwargs.get('post_id'))
+        serializer.save(author=self.request.user, post=post)
+
 class FollowViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                     viewsets.GenericViewSet):
     """Список подписок."""
 
     serializer_class = FollowSerializer
     permission_classes = (permissions.IsAuthenticated,)
-    filter_backends = (filters.SearchFilter,)
-    search_fields = ('following__username',)
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['following__username']
+    pagination_class = None
 
     def get_queryset(self):
         return self.request.user.follower.all()
