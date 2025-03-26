@@ -16,6 +16,7 @@ class PostSerializer(serializers.ModelSerializer):
     group = serializers.PrimaryKeyRelatedField(
         queryset=Group.objects.all(), required=False, allow_null=True
     )
+    
     class Meta:
         model = Post
         fields = '__all__'
