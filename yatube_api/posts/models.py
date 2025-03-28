@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.db import models
 
 User = get_user_model()
@@ -27,15 +26,7 @@ class Follow(models.Model):
             models.UniqueConstraint(
                 fields=('user', 'following'),
                 name='unique_follow'
-            ),
-        )
-
-    def clean(self):
-        if self.user == self.following:
-            raise ValidationError("Вы не можете подписаться на себя")
-
-    def __str__(self):
-        return f'{self.user} подписан на {self.following}'
+            ),)
 
     def __str__(self):
         return f'{self.user} подписан на {self.following}'
